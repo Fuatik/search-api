@@ -1,0 +1,20 @@
+# Normalize line endings to LF in the repository
+* text=auto eol=lf
+
+# Explicitly binary files
+*.jar binary
+*.war binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+
+# Shell scripts: LF
+*.sh text eol=lf
+mvnw text eol=lf
+
+# Windows batch scripts: CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
