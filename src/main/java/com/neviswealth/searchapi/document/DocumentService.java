@@ -1,5 +1,6 @@
 package com.neviswealth.searchapi.document;
 
+import com.neviswealth.searchapi.api.exception.ResourceNotFoundException;
 import com.neviswealth.searchapi.client.ClientNotFoundException;
 import com.neviswealth.searchapi.client.ClientRepository;
 import com.neviswealth.searchapi.embedding.EmbeddingProvider;
@@ -57,5 +58,13 @@ public class DocumentService {
 
         documentRepository.save(entity);
         return entity;
+    }
+
+    public DocumentEntity findById(UUID id) {
+        if (id == null) {
+            throw new IllegalArgumentException("id must not be null");
+        }
+        return documentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Document", id));
     }
 }

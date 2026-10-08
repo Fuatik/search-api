@@ -13,7 +13,7 @@ public final class QueryNormalizer {
             return "";
         }
 
-        return Normalizer.normalize(raw, java.text.Normalizer.Form.NFKC)
+        return Normalizer.normalize(raw, Normalizer.Form.NFKC)
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^\\p{L}\\p{N}\\s]", " ")
                 .trim()

@@ -43,4 +43,12 @@ public class ClientService {
         clientRepository.save(entity);
         return entity;
     }
+
+    public ClientEntity findById(UUID id) {
+        if (id == null) {
+            throw new IllegalArgumentException("id must not be null");
+        }
+        return clientRepository.findById(id)
+                .orElseThrow(() -> new ClientNotFoundException(id));
+    }
 }
