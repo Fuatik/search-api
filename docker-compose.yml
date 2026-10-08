@@ -16,5 +16,25 @@ services:
       timeout: 5s
       retries: 5
 
+  app:
+    build: .
+    container_name: search-api-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/searchapi
+      SPRING_DATASOURCE_USERNAME: searchapi
+      SPRING_DATASOURCE_PASSWORD: searchapi
+      SPRING_PROFILES_ACTIVE: default
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/actuator/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
 volumes:
   pgdata:

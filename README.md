@@ -10,15 +10,26 @@ Nevis Search API is a Java/Spring Boot home assignment that provides client/docu
 
 ## Quick start
 
+Option 1 — Full stack in Docker:
+
 ```bash
-docker compose up -d
-./mvnw spring-boot:run
+docker compose up --build
+```
+
+Then open `http://localhost:8080/swagger-ui.html`
+
+Option 2 — Only Postgres in Docker, app via Maven (development):
+
+```bash
+docker compose up -d postgres
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./mvnw spring-boot:run
 ```
 
 Health check (application responding):
 
 ```bash
-curl -i "http://localhost:8080/v3/api-docs"
+curl http://localhost:8080/actuator/health
+# {"status":"UP"}
 ```
 
 Swagger UI:

@@ -2,15 +2,24 @@ spring:
   application:
     name: search-api
   datasource:
-    url: jdbc:postgresql://localhost:5432/searchapi
-    username: searchapi
-    password: searchapi
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/searchapi}
+    username: ${SPRING_DATASOURCE_USERNAME:searchapi}
+    password: ${SPRING_DATASOURCE_PASSWORD:searchapi}
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: when-authorized
 
 app:
   embedding:
