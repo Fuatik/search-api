@@ -8,17 +8,21 @@ import com.neviswealth.searchapi.config.AppSearchProperties;
 import com.neviswealth.searchapi.document.DocumentEntity;
 import com.neviswealth.searchapi.document.DocumentRepository;
 import com.neviswealth.searchapi.embedding.EmbeddingProvider;
+
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
+@ActiveProfiles("integration")
 class DocumentSearchRepositorySearchIT {
 
     @Autowired
@@ -86,13 +90,26 @@ class DocumentSearchRepositorySearchIT {
                 appSearchProperties.getWeights().getTrigram()
         );
 
-        assertThat(results).isNotEmpty();
-        assertThat(results.getFirst().title()).isEqualTo("Electric Utility Bill - May");
-        assertThat(results.stream().map(DocumentSearchResult::title))
-                .anyMatch(title -> title.contains("Bank Statement"));
-        assertThat(results.getFirst().title()).isNotEqualTo("Passport");
+        String ranking = results.stream()
+                .map(r -> r.title() + "=" + r.finalScore())
+                .toList()
+                .toString();
 
-        results.forEach(result -> System.out.println(result.id() + " | " + result.title() + " | " + result.finalScore()));
+        assertThat(results)
+                .as("Search results for 'address proof' (ranking: %s)", ranking)
+                .isNotEmpty();
+
+        assertThat(results.getFirst().title())
+                .as("Top result for 'address proof' (ranking: %s)", ranking)
+                .isEqualTo("Electric Utility Bill - May");
+
+        assertThat(results.stream().map(DocumentSearchResult::title))
+                .as("'Bank Statement' should appear in results (ranking: %s)", ranking)
+                .anyMatch(title -> title.contains("Bank Statement"));
+
+        assertThat(results.getFirst().title())
+                .as("'Passport' must not rank first (ranking: %s)", ranking)
+                .isNotEqualTo("Passport");
     }
 
     private void saveDocument(String title, String content) {
@@ -132,7 +149,7 @@ class DocumentSearchRepositorySearchIT {
             if (i > 0) {
                 builder.append(',');
             }
-            builder.append(Float.toString(vector[i]));
+            builder.append(vector[i]);
         }
         builder.append(']');
         return builder.toString();
