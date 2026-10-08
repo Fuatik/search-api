@@ -1,0 +1,34 @@
+spring:
+  application:
+    name: search-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/searchapi
+    username: searchapi
+    password: searchapi
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+app:
+  embedding:
+    provider: hashing
+    hashing:
+      dimensions: 384
+  search:
+    page-size-default: 20
+    weights:
+      lexical: 0.5
+      semantic: 0.3
+      trigram: 0.2
+    synonyms-path: classpath:synonyms/search-synonyms.yaml
+  summary:
+    provider: extractive
+    extractive:
+      min-sentences: 2
+      max-sentences: 3
+    ollama:
+      base-url: http://localhost:11434
+      model: llama3.2:1b
