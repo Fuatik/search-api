@@ -13,6 +13,8 @@ public class AppSummaryProperties {
 
     private Extractive extractive = new Extractive();
 
+    private Ollama ollama = new Ollama();
+
     @Getter
     @Setter
     public static class Extractive {
@@ -20,5 +22,14 @@ public class AppSummaryProperties {
         private int minSentences = 2;
 
         private int maxSentences = 3;
+    }
+
+    @Getter
+    @Setter
+    public static class Ollama {
+
+        private String baseUrl = "http://localhost:11434";
+
+        private String model = "llama3.2:1b";
     }
 }

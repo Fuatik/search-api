@@ -167,6 +167,10 @@ LLM expansion would add non-determinism, cost, and infrastructure/runtime variab
 
 Extractive summaries are deterministic, offline, and require no external API. This keeps response generation reproducible and environment-independent.
 
+### Optional: Ollama-backed summary
+
+An Ollama-backed summary provider is available as an opt-in path behind `app.summary.provider=ollama`. It requires a running Ollama instance with the `llama3.2:1b` model pulled (approximately `1.3 GB`). The default profile remains offline and deterministic with `ExtractiveSummaryProvider`.
+
 ### Why pgvector is part of the MVP (not a bonus)
 
 The assignment requires semantic retrieval. pgvector enables native vector storage/indexing in PostgreSQL and allows semantic scoring to participate directly in ranking.
@@ -178,6 +182,16 @@ Stable ordering is required for predictable pagination and reproducible results.
 ### Why JDK 21 and not a newer JDK
 
 JDK 21 is the verified baseline for this codebase and test toolchain. Newer JDKs (22+) currently break Byte Buddy/Mockito instrumentation used by tests.
+
+## Running with Ollama
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.llm.yml up -d
+docker compose exec ollama ollama pull llama3.2:1b
+JAVA_HOME=$(/usr/libexec/java_home -v 21) ./mvnw spring-boot:run -Dspring-boot.run.profiles=ollama
+```
+
+Default profile behavior is unchanged: it stays offline and uses `ExtractiveSummaryProvider`.
 
 ## Testing
 
