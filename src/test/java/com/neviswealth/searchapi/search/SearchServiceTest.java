@@ -32,8 +32,6 @@ class SearchServiceTest {
     @Mock
     private EmbeddingProvider embeddingProvider;
 
-    private SynonymExpander synonymExpander;
-
     @Captor
     private ArgumentCaptor<String> queryVectorCaptor;
 
@@ -44,7 +42,7 @@ class SearchServiceTest {
         AppSearchProperties properties = new AppSearchProperties();
         Map<String, List<String>> synonyms = new LinkedHashMap<>();
         synonyms.put("address proof", List.of("utility bill"));
-        synonymExpander = new SynonymExpander(synonyms);
+        SynonymExpander synonymExpander = new SynonymExpander(synonyms);
         searchService = new SearchService(documentRepository, embeddingProvider, synonymExpander, properties);
     }
 

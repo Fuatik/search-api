@@ -4,9 +4,9 @@ Nevis Search API is a Java/Spring Boot home assignment that provides client/docu
 
 ## Requirements
 
-- JDK `21` (LTS) (verified baseline).
-- Docker (for PostgreSQL + pgvector via `docker compose`).
-- Maven Wrapper (`./mvnw`, no global Maven required).
+- JDK 21 (LTS) — the verified baseline for this project. The project targets Java 21 bytecode.
+- Docker — for PostgreSQL 16 with pgvector.
+- Maven Wrapper (`./mvnw`) — no global Maven required.
 
 ## Quick start
 
@@ -35,7 +35,38 @@ Swagger UI:
 | GET | `/api/v1/documents/{id}` | `200`, `400`, `404`, `500` |
 | GET | `/api/v1/search?q=&page=&size=` | `200`, `400`, `500` |
 
+500 is a fallback for unexpected errors and returns a generic RFC7807 body.
+
 Error responses use RFC7807 `ProblemDetail`.
+
+## Error responses
+
+Example `400 Bad Request` for invalid email:
+
+```bash
+curl -i -X POST "http://localhost:8080/api/v1/clients" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "not-an-email",
+    "description": "Example client",
+    "social_links": ["https://example.com/john"]
+  }'
+```
+
+```json
+{
+  "type": "about:blank",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "email must be a well-formed email address",
+  "instance": "/api/v1/clients",
+  "errors": {
+    "email": "must be a well-formed email address"
+  }
+}
+```
 
 ## Example: semantic search
 
@@ -47,16 +78,18 @@ Create a client:
 curl -X POST "http://localhost:8080/api/v1/clients" \
   -H "Content-Type: application/json" \
   -d '{
-    "firstName": "John",
-    "lastName": "Doe",
-    "email": "john.doe@example.com"
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john.doe@example.com",
+    "description": "Seeded search demo client",
+    "social_links": []
   }'
 ```
 
 Add document 1:
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/clients/1d46e4f9-cf9a-40a7-a56a-906cbd187dfc/documents" \
+curl -X POST "http://localhost:8080/api/v1/clients/e0b3bf9a-feea-4a8f-8693-444b63928fcf/documents" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Electric Utility Bill - May",
@@ -67,7 +100,7 @@ curl -X POST "http://localhost:8080/api/v1/clients/1d46e4f9-cf9a-40a7-a56a-906cb
 Add document 2:
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/clients/1d46e4f9-cf9a-40a7-a56a-906cbd187dfc/documents" \
+curl -X POST "http://localhost:8080/api/v1/clients/e0b3bf9a-feea-4a8f-8693-444b63928fcf/documents" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Bank Statement - June",
@@ -78,11 +111,11 @@ curl -X POST "http://localhost:8080/api/v1/clients/1d46e4f9-cf9a-40a7-a56a-906cb
 Add document 3:
 
 ```bash
-curl -X POST "http://localhost:8080/api/v1/clients/1d46e4f9-cf9a-40a7-a56a-906cbd187dfc/documents" \
+curl -X POST "http://localhost:8080/api/v1/clients/e0b3bf9a-feea-4a8f-8693-444b63928fcf/documents" \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Travel Itinerary",
-    "content": "Flight and hotel booking details for business travel."
+    "title": "Passport",
+    "content": "Identity document. Issued by government. Photo and signature."
   }'
 ```
 
@@ -100,8 +133,8 @@ curl "http://localhost:8080/api/v1/search?q=address+proof"
   "totalPages": 1,
   "items": [
     {
-      "documentId": "c535d3d3-040f-4101-93c9-a204e2cf30db",
-      "clientId": "1d46e4f9-cf9a-40a7-a56a-906cbd187dfc",
+      "documentId": "351a514d-7edc-48c9-88f9-a69f4e26938d",
+      "clientId": "e0b3bf9a-feea-4a8f-8693-444b63928fcf",
       "title": "Electric Utility Bill - May",
       "summary": "Monthly utility bill for 340 kWh. Reference: address proof. Customer: John Doe.",
       "scores": {
@@ -111,11 +144,11 @@ curl "http://localhost:8080/api/v1/search?q=address+proof"
         "finalScore": 0.43220168624007055
       },
       "matchReasons": ["FTS_MATCH", "TRIGRAM_MATCH"],
-      "createdAt": "2026-10-08T21:53:50.672837Z"
+      "createdAt": "2026-10-08T22:32:16.244099Z"
     },
     {
-      "documentId": "8c88efd1-103c-4fda-a81d-e0a5dec1e252",
-      "clientId": "1d46e4f9-cf9a-40a7-a56a-906cbd187dfc",
+      "documentId": "c338e448-ee1d-4ae4-91c4-ce8a53baedd3",
+      "clientId": "e0b3bf9a-feea-4a8f-8693-444b63928fcf",
       "title": "Bank Statement - June",
       "summary": "Bank statement for June. Monthly account summary. Address on file confirmed.",
       "scores": {
@@ -125,11 +158,13 @@ curl "http://localhost:8080/api/v1/search?q=address+proof"
         "finalScore": 0.3184868017767039
       },
       "matchReasons": ["FTS_MATCH", "TRIGRAM_MATCH"],
-      "createdAt": "2026-10-08T21:53:56.548363Z"
+      "createdAt": "2026-10-08T22:32:21.418951Z"
     }
   ]
 }
 ```
+
+The third seeded document (Passport) does not appear in the results because it has no relevance signals for 'address proof': no synonym match, no FTS match, low trigram similarity, and no semantic overlap. This demonstrates that the ranking filter does not return false positives.
 
 ## Architecture
 
@@ -171,6 +206,13 @@ Extractive summaries are deterministic, offline, and require no external API. Th
 
 An Ollama-backed summary provider is available as an opt-in path behind `app.summary.provider=ollama`. It requires a running Ollama instance with the `llama3.2:1b` model pulled (approximately `1.3 GB`). The default profile remains offline and deterministic with `ExtractiveSummaryProvider`.
 
+### Why in-memory pagination instead of SQL OFFSET
+
+The native query combines FTS, trigram, and pgvector cosine into a weighted
+score computed in Java. Pagination is applied after ranking with a hard
+candidate cap of 200. Pushing OFFSET into SQL would require materializing
+the ranked set anyway, so the split is deliberate.
+
 ### Why pgvector is part of the MVP (not a bonus)
 
 The assignment requires semantic retrieval. pgvector enables native vector storage/indexing in PostgreSQL and allows semantic scoring to participate directly in ranking.
@@ -179,9 +221,12 @@ The assignment requires semantic retrieval. pgvector enables native vector stora
 
 Stable ordering is required for predictable pagination and reproducible results. Explicit tie-break rules prevent ordering drift when scores are close.
 
-### Why JDK 21 and not a newer JDK
+### Why target JDK 21
 
-JDK 21 is the verified baseline for this codebase and test toolchain. Newer JDKs (22+) currently break Byte Buddy/Mockito instrumentation used by tests.
+JDK 21 is an LTS release and the current supported baseline for Spring Boot 3.4.x.
+Non-LTS JDKs may lag in tooling support across transitive test dependencies
+such as Byte Buddy and Mockito. Targeting an LTS keeps the project reproducible
+and aligned with production deployments of Spring Boot 3.4.x.
 
 ## Running with Ollama
 
@@ -191,28 +236,45 @@ docker compose exec ollama ollama pull llama3.2:1b
 JAVA_HOME=$(/usr/libexec/java_home -v 21) ./mvnw spring-boot:run -Dspring-boot.run.profiles=ollama
 ```
 
-Default profile behavior is unchanged: it stays offline and uses `ExtractiveSummaryProvider`.
+The default profile stays offline and uses `ExtractiveSummaryProvider`; `OllamaSummaryProvider` is opt-in via the `ollama` profile or `app.summary.provider=ollama`.
+
+Input:
+"This employment agreement is made between Acme Corporation and Jane Smith,
+effective January 1, 2026. The employee agrees to work 40 hours per week as
+a Senior Engineer. Compensation is set at 150,000 USD annually. The contract
+may be terminated with 30 days notice. Confidentiality and non-compete clauses
+apply for a period of 12 months after termination."
+
+Extractive (default):
+"This employment agreement is made between Acme Corporation and Jane Smith,
+effective January 1, 2026. The employee agrees to work 40 hours per week as
+a Senior Engineer. Compensation is set at 150,000 USD annually."
+
+Ollama (Llama 3.2 1B, verified locally):
+"The employment agreement between Acme Corporation and Jane Smith includes a
+12-month non-compete clause and 30-day notice period for termination. Jane will
+work 40 hours per week as a Senior Engineer and receive an annual salary of
+$150,000. The agreement also includes confidentiality and non-compete clauses."
+
+Extractive preserves the original sentences verbatim; Ollama paraphrases and reorders content. The default extractive provider is recommended for offline and CI usage; the Ollama path demonstrates how the pluggable SummaryProvider interface integrates an LLM in production.
 
 ## Testing
 
-- Default lane:
-
 ```bash
-./mvnw -q clean test
+./mvnw -q clean test                                     # default lane, no DB
+./mvnw -q clean test -Dspring.profiles.active=integration  # integration lane, needs Postgres
 ```
 
-  - Runs unit tests and `@WebMvcTest` slices.
-  - Does not require a running database.
-
-- Integration lane:
-
-```bash
-docker compose up -d
-./mvnw -q clean test -Dspring.profiles.active=integration
-```
-
-  - Runs integration coverage against PostgreSQL/pgvector (profile-gated).
-  - Profile gating keeps the default lane fast and DB-free while still validating SQL/vector behavior when explicitly requested.
+- Default lane classes:
+  - `ClientControllerTest`, `DocumentControllerTest`, `SearchControllerTest`
+  - `ClientServiceTest`, `DocumentServiceTest`, `SearchServiceTest`
+  - `QueryNormalizerTest`, `SynonymExpanderTest`
+  - `HashingEmbeddingProviderTest`
+  - `ExtractiveSummaryProviderTest`, `OllamaSummaryProviderTest`
+- Integration lane classes (with `integration` profile):
+  - `RepositorySmokeTest`
+  - `DocumentSearchRepositorySearchIT`
+  - `SearchRankingAcceptanceIT`
 
 ## Project layout
 
@@ -243,4 +305,3 @@ src/test/java/com/neviswealth/searchapi
 - Integration tests require a running Postgres.
 - Testcontainers integration is intentionally out of scope.
 - No authentication, no rate limiting, no multi-tenancy — out of scope.
-- Optional LLM-based document summary (for example, Ollama + Llama 3.2 1B) behind a feature flag is a possible extension and is not implemented.

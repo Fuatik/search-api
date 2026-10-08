@@ -24,10 +24,10 @@ public class DocumentRepositoryImpl implements DocumentSearchRepositoryCustom {
                 d.content,
                 d.summary,
                 d.created_at,
-                ts_rank_cd(to_tsvector('simple', coalesce(d.title,'') || ' ' || coalesce(d.content,'')),
+                ts_rank_cd(to_tsvector('simple', d.title || ' ' || d.content),
                            to_tsquery('simple', :tsQuery)) AS lexical_score,
-                GREATEST(similarity(coalesce(d.title,''), :rawQuery),
-                         similarity(coalesce(d.content,''), :rawQuery)) AS trigram_score,
+                GREATEST(similarity(d.title, :rawQuery),
+                         similarity(d.content, :rawQuery)) AS trigram_score,
                 CASE
                   WHEN d.embedding IS NULL THEN 0.0
                   ELSE 1.0 - (d.embedding <=> CAST(:queryVector AS vector))
@@ -44,7 +44,7 @@ public class DocumentRepositoryImpl implements DocumentSearchRepositoryCustom {
             WHERE lexical_score > 0
                OR trigram_score > 0.1
                OR semantic_score > 0.5
-            ORDER BY final_score DESC, lexical_score DESC, created_at DESC, id ASC
+            ORDER BY final_score DESC, lexical_score DESC, created_at DESC, id
             LIMIT :limit
             """;
 

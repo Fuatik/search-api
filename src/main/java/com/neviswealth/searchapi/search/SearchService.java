@@ -95,7 +95,7 @@ public class SearchService {
             if (i > 0) {
                 builder.append(',');
             }
-            builder.append(Float.toString(vector[i]));
+            builder.append(vector[i]);
         }
         builder.append(']');
         return builder.toString();

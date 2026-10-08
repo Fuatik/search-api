@@ -64,7 +64,7 @@ public class ExtractiveSummaryProvider implements SummaryProvider {
         }
 
         int maxSentences = appSummaryProperties.getExtractive().getMaxSentences();
-        int limit = Math.max(1, Math.min(maxSentences, sentences.size()));
+        int limit = Math.clamp(sentences.size(), 1, maxSentences);
         List<SentenceScore> top = scored.stream()
                 .sorted(Comparator.comparingDouble(SentenceScore::score).reversed())
                 .limit(limit)

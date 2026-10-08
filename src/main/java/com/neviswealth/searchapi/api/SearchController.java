@@ -20,7 +20,7 @@ public class SearchController {
 
     @GetMapping
     public SearchResponse search(
-            @RequestParam(required = true) String q,
+            @RequestParam String q,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size
     ) {
