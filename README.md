@@ -36,6 +36,20 @@ Swagger UI:
 
 - `http://localhost:8080/swagger-ui.html`
 
+## Live deployment
+
+- API: `https://search-api-production-8bfe.up.railway.app`
+- Swagger UI: `https://search-api-production-8bfe.up.railway.app/swagger-ui.html`
+- Health: `https://search-api-production-8bfe.up.railway.app/actuator/health`
+
+Deployed with the `default` profile (`ExtractiveSummaryProvider`). PostgreSQL 16 + pgvector is managed by Railway.
+
+To try semantic search:
+
+1. `POST /api/v1/clients`
+2. `POST /api/v1/clients/{id}/documents` with title `Electric Utility Bill - May` and content containing `address proof`
+3. `GET /api/v1/search?q=address+proof` — the utility bill ranks first.
+
 ## API
 
 | Method | Path | Status codes |
@@ -269,6 +283,14 @@ $150,000. The agreement also includes confidentiality and non-compete clauses."
 
 Extractive preserves the original sentences verbatim; Ollama paraphrases and reorders content. The default extractive provider is recommended for offline and CI usage; the Ollama path demonstrates how the pluggable SummaryProvider interface integrates an LLM in production.
 
+### Note on Ollama deployment
+
+The `OllamaSummaryProvider` is fully implemented and unit-tested with a mocked `ChatModel`, and verified end-to-end locally with `llama3.2:1b`: the same `Employment Contract` input produces a paraphrased LLM summary, distinct from the extractive output.
+
+A Railway deployment of Ollama was attempted but abandoned. Railway's shared CPU does not provide sufficient compute for LLM inference: `llama.cpp` detects the host's 96 cores and spawns 48 threads, exceeding the container's CPU quota, which causes request timeouts. Ollama 1.x also no longer honors `OLLAMA_NUM_THREADS` (legacy variable, not propagated to `llama-server`). The live deployment therefore uses the default `ExtractiveSummaryProvider` for stability and reproducibility.
+
+The Ollama path remains fully functional locally; see the commands above.
+
 ## Testing
 
 ```bash
@@ -316,3 +338,4 @@ src/test/java/com/neviswealth/searchapi
 - Integration tests require a running Postgres.
 - Testcontainers integration is intentionally out of scope.
 - No authentication, no rate limiting, no multi-tenancy — out of scope.
+- Ollama-backed LLM summary is implemented and works locally; running it on Railway's shared CPU is impractical (see "Note on Ollama deployment").
