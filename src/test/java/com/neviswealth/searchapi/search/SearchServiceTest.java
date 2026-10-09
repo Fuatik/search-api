@@ -7,6 +7,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.neviswealth.searchapi.client.ClientRepository;
 import com.neviswealth.searchapi.config.AppSearchProperties;
 import com.neviswealth.searchapi.document.DocumentRepository;
 import com.neviswealth.searchapi.embedding.EmbeddingProvider;
@@ -30,6 +31,9 @@ class SearchServiceTest {
     private DocumentRepository documentRepository;
 
     @Mock
+    private ClientRepository clientRepository;
+
+    @Mock
     private EmbeddingProvider embeddingProvider;
 
     @Captor
@@ -43,7 +47,7 @@ class SearchServiceTest {
         Map<String, List<String>> synonyms = new LinkedHashMap<>();
         synonyms.put("address proof", List.of("utility bill"));
         SynonymExpander synonymExpander = new SynonymExpander(synonyms);
-        searchService = new SearchService(documentRepository, embeddingProvider, synonymExpander, properties);
+        searchService = new SearchService(documentRepository, clientRepository, embeddingProvider, synonymExpander, properties);
     }
 
     @Test
@@ -64,6 +68,7 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         );
+        verify(clientRepository, never()).searchCandidates(eq(""), eq(""), eq(0));
     }
 
     @Test
@@ -84,6 +89,7 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         );
+        verify(clientRepository, never()).searchCandidates(eq(""), eq(""), eq(0));
     }
 
     @Test
@@ -98,6 +104,8 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         )).thenReturn(sampleResults());
+        when(clientRepository.searchCandidates(eq("address | proof | utility | bill"), eq("address proof"), eq(200)))
+                .thenReturn(List.of());
 
         SearchResultPage result = searchService.search("Address Proof!", 0, 2);
 
@@ -110,6 +118,7 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         );
+        verify(clientRepository).searchCandidates(eq("address | proof | utility | bill"), eq("address proof"), eq(200));
         assertThat(queryVectorCaptor.getValue()).startsWith("[").endsWith("]");
         assertThat(result.items()).hasSize(2);
         assertThat(result.totalElements()).isEqualTo(3);
@@ -128,6 +137,8 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         )).thenReturn(sampleResults());
+        when(clientRepository.searchCandidates(eq("address | proof | utility | bill"), eq("address proof"), eq(200)))
+                .thenReturn(List.of());
 
         SearchResultPage result = searchService.search("address proof", 0, 2);
 
@@ -148,6 +159,8 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         )).thenReturn(sampleResults());
+        when(clientRepository.searchCandidates(eq("address | proof | utility | bill"), eq("address proof"), eq(200)))
+                .thenReturn(List.of());
 
         SearchResultPage result = searchService.search("address proof", 1, 2);
 
@@ -166,6 +179,8 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         )).thenReturn(sampleResults());
+        when(clientRepository.searchCandidates(eq("address | proof | utility | bill"), eq("address proof"), eq(200)))
+                .thenReturn(List.of());
 
         SearchResultPage result = searchService.search("address proof", 0, 1000);
 
@@ -184,11 +199,73 @@ class SearchServiceTest {
                 anyFloat(),
                 anyFloat()
         )).thenReturn(sampleResults());
+        when(clientRepository.searchCandidates(eq("address | proof | utility | bill"), eq("address proof"), eq(200)))
+                .thenReturn(List.of());
 
         SearchResultPage result = searchService.search("address proof", -1, 2);
 
         assertThat(result.page()).isZero();
         assertThat(result.items()).hasSize(2);
+    }
+
+    @Test
+    void mergesDocumentAndClientResultsAndOrdersByFinalScore() {
+        UUID clientId = UUID.randomUUID();
+        when(embeddingProvider.embed("john")).thenReturn(new float[]{0.9f});
+        when(documentRepository.searchCandidates(
+                eq("john"),
+                eq("john"),
+                eq("[0.9]"),
+                eq(200),
+                anyFloat(),
+                anyFloat(),
+                anyFloat()
+        )).thenReturn(List.of(
+                new DocumentSearchResult(UUID.randomUUID(), clientId, "Doc Mid", "x", null, Instant.now(), 0.4, 0.3, 0.2, 0.65)
+        ));
+        when(clientRepository.searchCandidates(eq("john"), eq("john"), eq(200))).thenReturn(List.of(
+                new ClientSearchResult(UUID.randomUUID(), "John", "Doe", "john@example.com", "A", Instant.now(), 0.5, 0.3, 0.9),
+                new ClientSearchResult(UUID.randomUUID(), "Jane", "Doe", "jane@example.com", "B", Instant.now(), 0.4, 0.3, 0.6)
+        ));
+
+        SearchResultPage result = searchService.search("john", 0, 10);
+
+        assertThat(result.totalElements()).isEqualTo(3);
+        assertThat(result.items()).hasSize(3);
+        assertThat(result.items().get(0).finalScore()).isEqualTo(0.9);
+        assertThat(result.items().get(1).finalScore()).isEqualTo(0.65);
+        assertThat(result.items().get(2).finalScore()).isEqualTo(0.6);
+    }
+
+    @Test
+    void paginationWorksAcrossMixedResultTypes() {
+        UUID clientId = UUID.randomUUID();
+        Instant now = Instant.now();
+        when(embeddingProvider.embed("john")).thenReturn(new float[]{0.9f});
+        when(documentRepository.searchCandidates(
+                eq("john"),
+                eq("john"),
+                eq("[0.9]"),
+                eq(200),
+                anyFloat(),
+                anyFloat(),
+                anyFloat()
+        )).thenReturn(List.of(
+                new DocumentSearchResult(UUID.randomUUID(), clientId, "Doc High", "x", null, now, 0.5, 0.2, 0.2, 0.95),
+                new DocumentSearchResult(UUID.randomUUID(), clientId, "Doc Mid", "x", null, now, 0.5, 0.2, 0.2, 0.75)
+        ));
+        when(clientRepository.searchCandidates(eq("john"), eq("john"), eq(200))).thenReturn(List.of(
+                new ClientSearchResult(UUID.randomUUID(), "John", "Doe", "john@example.com", "A", now, 0.5, 0.3, 0.85)
+        ));
+
+        SearchResultPage firstPage = searchService.search("john", 0, 2);
+        SearchResultPage secondPage = searchService.search("john", 1, 2);
+
+        assertThat(firstPage.items()).hasSize(2);
+        assertThat(firstPage.items().get(0).finalScore()).isEqualTo(0.95);
+        assertThat(firstPage.items().get(1).finalScore()).isEqualTo(0.85);
+        assertThat(secondPage.items()).hasSize(1);
+        assertThat(secondPage.items().getFirst().finalScore()).isEqualTo(0.75);
     }
 
     private static List<DocumentSearchResult> sampleResults() {

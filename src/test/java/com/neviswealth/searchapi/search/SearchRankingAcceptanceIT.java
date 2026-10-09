@@ -86,7 +86,12 @@ class SearchRankingAcceptanceIT {
 
         SearchResultPage page = searchService.search("address proof", 0, 20);
 
-        String ranking = page.items().stream()
+        List<DocumentSearchResult> documentItems = page.items().stream()
+                .filter(DocumentSearchResult.class::isInstance)
+                .map(DocumentSearchResult.class::cast)
+                .toList();
+
+        String ranking = documentItems.stream()
                 .map(r -> r.title()
                         + "[final=" + r.finalScore()
                         + ",lexical=" + r.lexicalScore()
@@ -100,11 +105,11 @@ class SearchRankingAcceptanceIT {
                 .as("Search results for 'address proof' (ranking: %s)", ranking)
                 .isGreaterThanOrEqualTo(1);
 
-        assertThat(page.items())
+        assertThat(documentItems)
                 .as("Search results for 'address proof' (ranking: %s)", ranking)
                 .isNotEmpty();
 
-        DocumentSearchResult top = page.items().getFirst();
+        DocumentSearchResult top = documentItems.getFirst();
 
         assertThat(top.title())
                 .as("Top result for 'address proof' (ranking: %s)", ranking)
@@ -118,7 +123,7 @@ class SearchRankingAcceptanceIT {
                 .as("Top result lexicalScore must be > 0 (ranking: %s)", ranking)
                 .isGreaterThan(0.0);
 
-        assertThat(page.items().getFirst().title())
+        assertThat(top.title())
                 .as("'Passport' must not rank first (ranking: %s)", ranking)
                 .isNotEqualTo("Passport");
     }

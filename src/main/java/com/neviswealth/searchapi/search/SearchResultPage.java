@@ -7,6 +7,6 @@ public record SearchResultPage(
         int size,
         long totalElements,
         int totalPages,
-        List<DocumentSearchResult> items
+        List<? extends SearchCandidateResult> items
 ) {
 }

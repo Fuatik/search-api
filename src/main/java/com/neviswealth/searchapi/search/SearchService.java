@@ -1,8 +1,10 @@
 package com.neviswealth.searchapi.search;
 
+import com.neviswealth.searchapi.client.ClientRepository;
 import com.neviswealth.searchapi.config.AppSearchProperties;
 import com.neviswealth.searchapi.document.DocumentRepository;
 import com.neviswealth.searchapi.embedding.EmbeddingProvider;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -14,17 +16,20 @@ public class SearchService {
     private static final int CANDIDATE_LIMIT = 200;
 
     private final DocumentRepository documentRepository;
+    private final ClientRepository clientRepository;
     private final EmbeddingProvider embeddingProvider;
     private final SynonymExpander synonymExpander;
     private final AppSearchProperties appSearchProperties;
 
     public SearchService(
             DocumentRepository documentRepository,
+            ClientRepository clientRepository,
             EmbeddingProvider embeddingProvider,
             SynonymExpander synonymExpander,
             AppSearchProperties appSearchProperties
     ) {
         this.documentRepository = documentRepository;
+        this.clientRepository = clientRepository;
         this.embeddingProvider = embeddingProvider;
         this.synonymExpander = synonymExpander;
         this.appSearchProperties = appSearchProperties;
@@ -59,12 +64,18 @@ public class SearchService {
                 appSearchProperties.getWeights().getSemantic(),
                 appSearchProperties.getWeights().getTrigram()
         );
+        List<ClientSearchResult> clientCandidates = clientRepository.searchCandidates(tsQuery, normalized, CANDIDATE_LIMIT);
 
-        int from = Math.min(safePage * safeSize, candidates.size());
-        int to = Math.min(from + safeSize, candidates.size());
-        List<DocumentSearchResult> pageItems = List.copyOf(candidates.subList(from, to));
+        List<SearchCandidateResult> merged = java.util.stream.Stream.concat(candidates.stream(), clientCandidates.stream())
+                .map(SearchCandidateResult.class::cast)
+                .sorted(Comparator.comparingDouble(SearchCandidateResult::finalScore).reversed())
+                .toList();
 
-        long totalElements = candidates.size();
+        int from = Math.min(safePage * safeSize, merged.size());
+        int to = Math.min(from + safeSize, merged.size());
+        List<SearchCandidateResult> pageItems = List.copyOf(merged.subList(from, to));
+
+        long totalElements = merged.size();
         int totalPages = (int) ((totalElements + safeSize - 1) / safeSize);
 
         return new SearchResultPage(safePage, safeSize, totalElements, totalPages, pageItems);

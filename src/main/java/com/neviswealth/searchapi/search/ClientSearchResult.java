@@ -3,16 +3,15 @@ package com.neviswealth.searchapi.search;
 import java.time.Instant;
 import java.util.UUID;
 
-public record DocumentSearchResult(
+public record ClientSearchResult(
         UUID id,
-        UUID clientId,
-        String title,
-        String content,
-        String summary,
+        String firstName,
+        String lastName,
+        String email,
+        String description,
         Instant createdAt,
         double lexicalScore,
         double trigramScore,
-        double semanticScore,
         double finalScore
 ) implements SearchCandidateResult {
 }
