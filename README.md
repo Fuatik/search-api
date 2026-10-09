@@ -1,6 +1,6 @@
 # Nevis Search API
 
-Nevis Search API is a Java/Spring Boot home assignment that provides client/document management and ranked semantic-lexical document search. It combines deterministic embeddings, PostgreSQL full-text search, trigram similarity, and pgvector cosine distance in a reproducible offline pipeline. The project is designed for local execution with Dockerized Postgres and Maven Wrapper.
+Nevis Search API is a Java/Spring Boot home assignment that provides client/document management and ranked semantic-lexical search across clients and documents. It combines deterministic embeddings, PostgreSQL full-text search, trigram similarity, and pgvector cosine distance in a reproducible offline pipeline. The project is designed for local execution with Dockerized Postgres and Maven Wrapper.
 
 ## Requirements
 
@@ -44,21 +44,28 @@ Swagger UI:
 
 Deployed with the `default` profile (`ExtractiveSummaryProvider`). PostgreSQL 16 + pgvector is managed by Railway.
 
-To try semantic search:
+`GET /api/v1/search` returns both clients and documents in a unified ranked list. Each item has a `type` field: `CLIENT` or `DOCUMENT`.
+
+To try document search (semantic):
 
 1. `POST /api/v1/clients`
 2. `POST /api/v1/clients/{id}/documents` with title `Electric Utility Bill - May` and content containing `address proof`
 3. `GET /api/v1/search?q=address+proof` — the utility bill ranks first.
 
+To try client search:
+
+1. `POST /api/v1/clients` with `email = john.doe@neviswealth.com`
+2. `GET /api/v1/search?q=NevisWealth` — the client ranks first (matched by trigram on the email).
+
 ## API
 
-| Method | Path | Status codes |
-|---|---|---|
-| POST | `/api/v1/clients` | `201`, `400`, `409`, `422`, `500` |
-| GET | `/api/v1/clients/{id}` | `200`, `400`, `404`, `500` |
-| POST | `/api/v1/clients/{id}/documents` | `201`, `400`, `404`, `422`, `500` |
-| GET | `/api/v1/documents/{id}` | `200`, `400`, `404`, `500` |
-| GET | `/api/v1/search?q=&page=&size=` | `200`, `400`, `500` |
+| Method | Path | Description | Status codes |
+|---|---|---|---|
+| POST | `/api/v1/clients` | creates a client | `201`, `400`, `409`, `422`, `500` |
+| GET | `/api/v1/clients/{id}` | returns a client by id | `200`, `400`, `404`, `500` |
+| POST | `/api/v1/clients/{id}/documents` | creates a document for a client | `201`, `400`, `404`, `422`, `500` |
+| GET | `/api/v1/documents/{id}` | returns a document by id | `200`, `400`, `404`, `500` |
+| GET | `/api/v1/search?q=&page=&size=` | returns mixed `CLIENT` and `DOCUMENT` items | `200`, `400`, `500` |
 
 500 is a fallback for unexpected errors and returns a generic RFC7807 body.
 
@@ -93,7 +100,7 @@ curl -i -X POST "http://localhost:8080/api/v1/clients" \
 }
 ```
 
-## Example: semantic search
+## Example: document search
 
 This walkthrough shows how `address proof` returns `Electric Utility Bill - May` at the top. Ranking is produced by synonym expansion + FTS + trigram + pgvector cosine, then merged with weighted scoring.
 
@@ -158,22 +165,26 @@ curl "http://localhost:8080/api/v1/search?q=address+proof"
   "totalPages": 1,
   "items": [
     {
-      "documentId": "351a514d-7edc-48c9-88f9-a69f4e26938d",
-      "clientId": "e0b3bf9a-feea-4a8f-8693-444b63928fcf",
+      "type": "DOCUMENT",
+      "id": "be55ab57-9f05-4f22-8499-3f48253f42a0",
+      "documentId": "be55ab57-9f05-4f22-8499-3f48253f42a0",
+      "clientId": "0a1c1733-f0b1-4b0e-ad43-adb60564192c",
       "title": "Electric Utility Bill - May",
       "summary": "Monthly utility bill for 340 kWh. Reference: address proof. Customer: John Doe.",
       "scores": {
         "lexical": 0.6000000238418579,
         "trigram": 0.18666666746139526,
-        "semantic": 0.31622778273986474,
-        "finalScore": 0.43220168624007055
+        "semantic": 0.31622779216418806,
+        "finalScore": 0.43220168906736767
       },
       "matchReasons": ["FTS_MATCH", "TRIGRAM_MATCH"],
-      "createdAt": "2026-10-08T22:32:16.244099Z"
+      "createdAt": "2026-10-09T00:11:42.190626Z"
     },
     {
-      "documentId": "c338e448-ee1d-4ae4-91c4-ce8a53baedd3",
-      "clientId": "e0b3bf9a-feea-4a8f-8693-444b63928fcf",
+      "type": "DOCUMENT",
+      "id": "1529aac8-1d72-410f-95e2-251b4e423c56",
+      "documentId": "1529aac8-1d72-410f-95e2-251b4e423c56",
+      "clientId": "0a1c1733-f0b1-4b0e-ad43-adb60564192c",
       "title": "Bank Statement - June",
       "summary": "Bank statement for June. Monthly account summary. Address on file confirmed.",
       "scores": {
@@ -183,13 +194,42 @@ curl "http://localhost:8080/api/v1/search?q=address+proof"
         "finalScore": 0.3184868017767039
       },
       "matchReasons": ["FTS_MATCH", "TRIGRAM_MATCH"],
-      "createdAt": "2026-10-08T22:32:21.418951Z"
+      "createdAt": "2026-10-09T00:11:48.478183Z"
     }
   ]
 }
 ```
 
 The third seeded document (Passport) does not appear in the results because it has no relevance signals for 'address proof': no synonym match, no FTS match, low trigram similarity, and no semantic overlap. This demonstrates that the ranking filter does not return false positives.
+
+## Example: client search
+
+`GET /api/v1/search` also matches clients by `first_name`, `last_name`, `email`, and `description`. Client search uses FTS + trigram only (no embeddings), because these fields are short and keyword-driven.
+
+```bash
+curl "http://localhost:8080/api/v1/search?q=NevisWealth"
+```
+
+```json
+{
+  "page": 0, "size": 20, "totalElements": 1, "totalPages": 1,
+  "items": [
+    {
+      "type": "CLIENT",
+      "id": "0a1c1733-f0b1-4b0e-ad43-adb60564192c",
+      "documentId": null,
+      "clientId": null,
+      "title": "John Doe",
+      "summary": "High net worth client",
+      "scores": { "lexical": 0.0, "trigram": 0.47999998927116394, "semantic": 0.0, "finalScore": 0.14399999678134917 },
+      "matchReasons": ["TRIGRAM_MATCH"],
+      "createdAt": "2026-10-09T00:11:23.934605Z"
+    }
+  ]
+}
+```
+
+Client candidates and document candidates are merged into a single ranked list, sorted by `finalScore DESC` with the same tie-break rules.
 
 ## Architecture
 
@@ -198,8 +238,10 @@ The third seeded document (Passport) does not appear in the results because it h
 - Search pipeline:
   - `QueryNormalizer`
   - `SynonymExpander` (YAML-driven)
-  - native SQL with `ts_rank_cd`, `pg_trgm` similarity, `pgvector` cosine (`<=>`)
-  - Java weighted merge (`lexical=0.5`, `semantic=0.3`, `trigram=0.2`)
+  - Document candidates: native SQL with `ts_rank_cd`, `pg_trgm` similarity, `pgvector` cosine (`<=>`)
+  - Client candidates: native SQL with `ts_rank_cd`, `pg_trgm` similarity (no embeddings)
+  - Java weighted merge — documents: `lexical=0.5`, `semantic=0.3`, `trigram=0.2`; clients: `lexical=0.7`, `trigram=0.3`
+  - unified ranked list with `type: CLIENT | DOCUMENT`
   - in-memory pagination
 - Embeddings: deterministic hashing provider (`com.neviswealth.searchapi.embedding.HashingEmbeddingProvider`), `384` dimensions, no external APIs.
 - Summary: deterministic extractive provider (`com.neviswealth.searchapi.summary.ExtractiveSummaryProvider`), offline pure Java.
@@ -211,7 +253,7 @@ The third seeded document (Passport) does not appear in the results because it h
   - btree on `client_id`
   - btree on `created_at`
 - Embedding column mapping: `hibernate-vector 6.6.13.Final` with `@JdbcTypeCode(SqlTypes.VECTOR)` + `@Array(length = 384)`.
-- Tie-break order: `finalScore DESC` → `lexicalScore DESC` → `createdAt DESC` → `documentId ASC`.
+- Tie-break order: `finalScore DESC` → `lexicalScore DESC` → `createdAt DESC` → `id ASC`.
 
 ## Design decisions and trade-offs
 
@@ -237,6 +279,10 @@ The native query combines FTS, trigram, and pgvector cosine into a weighted
 score computed in Java. Pagination is applied after ranking with a hard
 candidate cap of 200. Pushing OFFSET into SQL would require materializing
 the ranked set anyway, so the split is deliberate.
+
+### Why client search uses FTS + trigram only (no embeddings)
+
+Client names, emails, and short descriptions are keyword-driven — embeddings add little value for these fields. FTS catches exact token matches; trigram handles partial matches and typos (e.g. `NevisWealth` against `john.doe@neviswealth.com`). Document search keeps embeddings because document content is longer and benefits from semantic similarity.
 
 ### Why pgvector is part of the MVP (not a bonus)
 
@@ -307,6 +353,7 @@ The Ollama path remains fully functional locally; see the commands above.
 - Integration lane classes (with `integration` profile):
   - `RepositorySmokeTest`
   - `DocumentSearchRepositorySearchIT`
+  - `ClientSearchRepositoryIT`
   - `SearchRankingAcceptanceIT`
 
 ## Project layout
@@ -335,6 +382,7 @@ src/test/java/com/neviswealth/searchapi
 ## Limitations and future work
 
 - Hashing embeddings are weak outside the curated synonym dictionary; a production deployment would compute sentence-transformer embeddings offline (Spark + sentence-transformers) and sync to Postgres.
+- Client search uses FTS + trigram only (no embeddings), which is sufficient for short keyword-driven fields but would not catch loose semantic queries such as "person who pays utility bills".
 - Integration tests require a running Postgres.
 - Testcontainers integration is intentionally out of scope.
 - No authentication, no rate limiting, no multi-tenancy — out of scope.
